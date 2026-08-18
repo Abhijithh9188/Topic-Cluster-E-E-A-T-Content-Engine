@@ -1,0 +1,895 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Content Cluster Generator</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/4.3.0/marked.min.js"></script>
+<style>
+  :root{
+    --bg:#0A1F33;
+    --bg-deep:#071626;
+    --surface:#0F2A45;
+    --surface-2:#123253;
+    --line:rgba(255,255,255,0.08);
+    --line-strong:rgba(255,255,255,0.16);
+    --ink:#EAF2F8;
+    --ink-dim:#9FB8CC;
+    --ink-faint:#6E8AA3;
+    --accent:#FFB454;
+    --accent-ink:#241505;
+    --info:#5EEAD4;
+    --commercial:#FF9E7A;
+    --transactional:#B39CFF;
+    --danger:#FF6B6B;
+    --radius:10px;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:
+      linear-gradient(var(--line) 1px, transparent 1px) 0 0/40px 40px,
+      linear-gradient(90deg, var(--line) 1px, transparent 1px) 0 0/40px 40px,
+      var(--bg);
+    color:var(--ink);
+    font-family:'Inter',sans-serif;
+    min-height:100vh;
+    padding:0 0 80px 0;
+  }
+  .wrap{max-width:1040px;margin:0 auto;padding:0 24px;}
+
+  header.hero{padding:56px 24px 40px;border-bottom:1px solid var(--line);}
+  .eyebrow{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:12px;
+    letter-spacing:0.14em;
+    text-transform:uppercase;
+    color:var(--info);
+    display:flex;align-items:center;gap:10px;
+    margin-bottom:18px;
+  }
+  .eyebrow::before{content:"";width:8px;height:8px;background:var(--info);border-radius:50%;box-shadow:0 0 8px var(--info);}
+  h1{
+    font-family:'Space Grotesk',sans-serif;
+    font-weight:700;
+    font-size:clamp(30px,4vw,44px);
+    line-height:1.08;
+    margin:0 0 14px;
+    letter-spacing:-0.01em;
+  }
+  h1 span{color:var(--accent);}
+  .sub{color:var(--ink-dim);font-size:16px;line-height:1.6;max-width:560px;margin:0;}
+
+  .panel{
+    background:var(--surface);
+    border:1px solid var(--line);
+    border-radius:var(--radius);
+    padding:28px;
+  }
+  .form-grid{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:16px;
+    margin-top:32px;
+  }
+  .field{display:flex;flex-direction:column;gap:6px;}
+  .field.full{grid-column:1 / -1;}
+  label{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:11px;
+    letter-spacing:0.08em;
+    text-transform:uppercase;
+    color:var(--ink-faint);
+  }
+  input, textarea, select{
+    background:var(--bg-deep);
+    border:1px solid var(--line-strong);
+    border-radius:6px;
+    color:var(--ink);
+    padding:11px 12px;
+    font-family:'Inter',sans-serif;
+    font-size:14px;
+    outline:none;
+    transition:border-color .15s;
+  }
+  input:focus, textarea:focus, select:focus{border-color:var(--accent);}
+  textarea{resize:vertical;min-height:64px;font-family:'Inter',sans-serif;}
+  ::placeholder{color:var(--ink-faint);}
+
+  .btn{
+    font-family:'Space Grotesk',sans-serif;
+    font-weight:600;
+    font-size:14px;
+    border:none;
+    border-radius:6px;
+    padding:13px 22px;
+    cursor:pointer;
+    transition:transform .1s, filter .15s;
+  }
+  .btn:active{transform:translateY(1px);}
+  .btn-primary{background:var(--accent);color:var(--accent-ink);}
+  .btn-primary:hover{filter:brightness(1.08);}
+  .btn-primary:disabled{opacity:0.5;cursor:not-allowed;}
+  .btn-ghost{background:transparent;border:1px solid var(--line-strong);color:var(--ink);}
+  .btn-ghost:hover{border-color:var(--accent);color:var(--accent);}
+  .btn-row{margin-top:22px;display:flex;gap:12px;align-items:center;}
+
+  .status{font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--ink-faint);}
+  .status.err{color:var(--danger);}
+
+  section.results{padding:48px 24px 0;display:none;}
+  section.results.show{display:block;}
+
+  .section-head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:22px;flex-wrap:wrap;gap:10px;}
+  .section-head h2{font-family:'Space Grotesk',sans-serif;font-size:20px;margin:0;}
+  .pillar-tag{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:12px;color:var(--accent);
+    border:1px solid var(--accent);
+    padding:4px 10px;border-radius:20px;
+  }
+
+  /* cluster map */
+  .map-wrap{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:20px;margin-bottom:28px;overflow:hidden;}
+  svg{display:block;width:100%;height:auto;}
+  .node-pillar{fill:var(--accent);}
+  .node-line{stroke:var(--line-strong);stroke-width:1.2;stroke-dasharray:3 4;}
+  .node-dot{stroke-width:2;fill:var(--bg-deep);cursor:pointer;}
+  .node-label{font-family:'IBM Plex Mono',monospace;font-size:9.5px;fill:var(--ink-dim);}
+  .node-label-pillar{font-family:'Space Grotesk',sans-serif;font-size:12px;font-weight:600;fill:var(--accent-ink);}
+
+  .legend{display:flex;gap:18px;flex-wrap:wrap;margin-top:14px;font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--ink-dim);}
+  .legend span{display:inline-flex;align-items:center;gap:6px;}
+  .dot{width:8px;height:8px;border-radius:50%;display:inline-block;}
+
+  .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px;}
+  .card{
+    background:var(--surface);
+    border:1px solid var(--line);
+    border-radius:var(--radius);
+    padding:18px;
+    display:flex;flex-direction:column;gap:10px;
+  }
+  .card-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;}
+  .intent-tag{
+    font-family:'IBM Plex Mono',monospace;font-size:10px;text-transform:uppercase;letter-spacing:.06em;
+    padding:3px 8px;border-radius:20px;white-space:nowrap;border:1px solid transparent;
+  }
+  .intent-informational{color:var(--info);border-color:var(--info);}
+  .intent-commercial{color:var(--commercial);border-color:var(--commercial);}
+  .intent-transactional{color:var(--transactional);border-color:var(--transactional);}
+  .card h3{font-family:'Space Grotesk',sans-serif;font-size:16px;margin:0;line-height:1.3;}
+  .kw{font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--accent);}
+  .angle{color:var(--ink-dim);font-size:13px;line-height:1.5;margin:0;}
+  .meta-row{display:flex;justify-content:space-between;align-items:center;font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--ink-faint);margin-top:2px;}
+  .diff{padding:2px 7px;border-radius:4px;background:var(--bg-deep);}
+  .diff-Low{color:#7EE787;}
+  .diff-Medium{color:var(--accent);}
+  .diff-High{color:var(--danger);}
+
+  .charcount{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--ink-faint);}
+
+  .draft-copy{
+    background:transparent;border:1px solid var(--line-strong);color:var(--ink-dim);
+    font-family:'IBM Plex Mono',monospace;font-size:10px;padding:5px 9px;border-radius:5px;cursor:pointer;
+  }
+  .draft-copy:hover{border-color:var(--accent);color:var(--accent);}
+  .draft-hint{font-size:11px;color:var(--ink-faint);margin-top:8px;line-height:1.5;}
+  .draft-hint mark{background:rgba(255,158,122,0.18);color:var(--commercial);padding:0 2px;border-radius:2px;}
+
+  .interview-btn{
+    margin-top:2px;
+    background:transparent;border:1px solid var(--transactional);color:var(--transactional);
+    font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:13px;
+    padding:10px 12px;border-radius:6px;cursor:pointer;text-align:left;
+    display:flex;justify-content:space-between;align-items:center;
+  }
+  .interview-btn:hover{filter:brightness(1.2);}
+  .interview-body{display:none;border-top:1px solid var(--line);padding-top:10px;margin-top:2px;}
+  .interview-body.show{display:block;}
+  .current-q{
+    font-family:'Space Grotesk',sans-serif;font-size:14px;color:var(--ink);
+    background:var(--bg-deep);border:1px solid var(--line-strong);border-radius:6px;
+    padding:12px;margin-bottom:8px;line-height:1.4;
+  }
+  .q-progress{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--ink-faint);margin-bottom:6px;}
+  .answer-row{display:flex;gap:8px;align-items:flex-start;}
+  .answer-row textarea{flex:1;min-height:44px;font-size:13px;}
+  .answer-row .btn{padding:10px 14px;font-size:12px;white-space:nowrap;}
+  .skip-link{
+    background:none;border:none;color:var(--ink-faint);font-family:'IBM Plex Mono',monospace;
+    font-size:10px;text-decoration:underline;cursor:pointer;margin-top:8px;padding:0;
+  }
+  .skip-link:hover{color:var(--ink-dim);}
+
+  .article-deliverable{display:flex;flex-direction:column;gap:12px;}
+  .article-field{background:var(--bg-deep);border:1px solid var(--line);border-radius:6px;padding:10px 12px;}
+  .article-field .lbl{font-family:'IBM Plex Mono',monospace;font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-faint);margin-bottom:4px;display:flex;justify-content:space-between;}
+  .article-field .val{font-size:13px;color:var(--ink);line-height:1.5;}
+  .article-body-text{
+    font-size:13.5px;line-height:1.75;color:var(--ink-dim);white-space:pre-wrap;
+    max-height:380px;overflow-y:auto;padding-right:4px;
+  }
+  .article-body-text mark{background:rgba(255,158,122,0.18);color:var(--commercial);padding:0 2px;border-radius:2px;}
+  .img-prompt-item{font-size:12px;color:var(--ink-dim);margin-bottom:8px;line-height:1.5;}
+  .img-prompt-item b{color:var(--ink);}
+  .link-placeholder-item{font-size:12px;color:var(--transactional);margin-bottom:4px;}
+  .sec-kw{display:flex;flex-wrap:wrap;gap:5px;margin-top:2px;}
+  .sec-kw span{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--ink-faint);background:var(--bg-deep);padding:2px 7px;border-radius:10px;}
+
+  /* Blog preview modal */
+  .preview-overlay{
+    position:fixed;inset:0;background:rgba(4,10,18,0.85);
+    display:none;align-items:flex-start;justify-content:center;
+    padding:56px 16px 40px;z-index:999;overflow-y:auto;
+  }
+  .preview-overlay.show{display:flex;}
+  .preview-close{
+    position:fixed;top:16px;right:20px;z-index:1000;
+    background:var(--surface);border:1px solid var(--line-strong);color:var(--ink);
+    font-family:'IBM Plex Mono',monospace;font-size:12px;
+    padding:9px 16px;border-radius:20px;cursor:pointer;
+  }
+  .preview-close:hover{border-color:var(--accent);color:var(--accent);}
+  .preview-window{
+    background:#fff;border-radius:10px;max-width:760px;width:100%;
+    overflow:hidden;box-shadow:0 30px 80px rgba(0,0,0,0.5);
+  }
+  .browser-bar{background:#E7E9EC;padding:10px 14px;display:flex;align-items:center;gap:10px;}
+  .traffic{display:flex;gap:6px;flex-shrink:0;}
+  .traffic span{width:11px;height:11px;border-radius:50%;display:inline-block;}
+  .traffic .r{background:#FF5F57;} .traffic .y{background:#FEBC2E;} .traffic .g{background:#28C840;}
+  .browser-url{background:#fff;border-radius:5px;padding:6px 12px;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#5b6470;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .wp-post{padding:38px 44px 60px;color:#1a1a1a;font-family:'Inter',sans-serif;}
+  .wp-hero{
+    width:100%;aspect-ratio:16/9;border-radius:8px;margin-bottom:26px;
+    background:linear-gradient(135deg,#e2e8f0,#cbd5e1);
+    display:flex;align-items:center;justify-content:center;text-align:center;padding:16px;
+  }
+  .wp-hero-label{font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:#64748b;}
+  .wp-meta{font-family:'IBM Plex Mono',monospace;font-size:12px;color:#8a8f98;margin-bottom:12px;}
+  .wp-title{font-family:'Space Grotesk',sans-serif;font-size:clamp(24px,4vw,33px);font-weight:700;line-height:1.18;color:#111;margin:0 0 22px;}
+  .wp-body{font-size:16.5px;line-height:1.85;color:#2b2b2b;}
+  .wp-body h2{font-family:'Space Grotesk',sans-serif;font-size:22px;font-weight:600;margin:38px 0 14px;color:#111;}
+  .wp-body h3{font-family:'Space Grotesk',sans-serif;font-size:18px;font-weight:600;margin:28px 0 10px;color:#111;}
+  .wp-body p{margin:0 0 18px;}
+  .wp-body ul, .wp-body ol{margin:0 0 18px;padding-left:22px;}
+  .wp-body li{margin-bottom:7px;}
+  .wp-body strong{color:#111;}
+  .wp-body table{width:100%;border-collapse:collapse;margin:22px 0;font-size:14.5px;}
+  .wp-body th, .wp-body td{border:1px solid #e2e8f0;padding:9px 12px;text-align:left;}
+  .wp-body th{background:#f8fafc;font-family:'Space Grotesk',sans-serif;font-weight:600;}
+  .wp-body mark{background:#FFE9DA;color:#B45309;padding:0 3px;border-radius:2px;}
+  .wp-inline-img{
+    width:100%;aspect-ratio:16/9;border-radius:8px;margin:28px 0;
+    background:linear-gradient(135deg,#e2e8f0,#cbd5e1);
+    display:flex;align-items:center;justify-content:center;text-align:center;padding:16px;
+  }
+  @media (max-width:640px){
+    .wp-post{padding:26px 22px 44px;}
+  }
+
+  .calendar{margin-top:36px;}
+  .week-row{display:flex;gap:10px;align-items:flex-start;margin-bottom:10px;}
+  .week-label{
+    font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--ink-faint);
+    width:64px;flex-shrink:0;padding-top:9px;
+  }
+  .week-items{display:flex;flex-wrap:wrap;gap:8px;flex:1;}
+  .week-pill{
+    background:var(--surface-2);border:1px solid var(--line);border-radius:6px;
+    padding:7px 11px;font-size:12px;color:var(--ink-dim);max-width:260px;
+  }
+  .week-pill b{color:var(--ink);font-weight:500;}
+
+  .export-row{margin-top:32px;display:flex;gap:12px;}
+  .footer-note{max-width:1040px;margin:60px auto 0;padding:0 24px;font-size:12px;color:var(--ink-faint);line-height:1.6;}
+
+  .empty-hint{color:var(--ink-faint);font-size:13px;margin-top:10px;}
+  @media (max-width:640px){
+    .form-grid{grid-template-columns:1fr;}
+    .week-row{flex-direction:column;}
+    .week-label{width:auto;padding-top:0;}
+  }
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="wrap">
+    <div class="eyebrow">Pillar & Cluster Content Engine</div>
+    <h1>Turn real site content into a<br><span>topic cluster</span> that ranks.</h1>
+    <p class="sub">Paste in actual copy from the client's site. Get a pillar topic, a cluster of blog ideas mapped by search intent, a publish calendar — and a first-person, humanized draft for any idea, ready for review and your own real specifics.</p>
+  </div>
+</header>
+
+<div class="wrap">
+  <div class="panel" style="margin-top:-1px;">
+    <div class="form-grid">
+      <div class="field">
+        <label>Business / site name</label>
+        <input id="bizName" type="text" placeholder="e.g. Coastal Dental Clinic">
+      </div>
+      <div class="field">
+        <label>Website URL (optional)</label>
+        <input id="bizUrl" type="text" placeholder="e.g. coastaldental.in">
+      </div>
+      <div class="field">
+        <label>Industry / niche</label>
+        <input id="niche" type="text" placeholder="e.g. dental clinic, B2B SaaS, home bakery">
+      </div>
+      <div class="field">
+        <label>Target location (for local SEO)</label>
+        <input id="location" type="text" placeholder="e.g. Kochi, Kerala — leave blank if not local">
+      </div>
+      <div class="field full">
+        <label>Who they're trying to reach</label>
+        <input id="audience" type="text" placeholder="e.g. new parents in Kerala looking for pediatric dentists">
+      </div>
+      <div class="field full">
+        <label>Services / products, or existing target keywords (optional)</label>
+        <textarea id="services" placeholder="e.g. root canal, teeth whitening, pediatric dentistry — or paste keywords you already know you want to target"></textarea>
+      </div>
+      <div class="field full">
+        <label>Real details to include (optional, but makes the post much stronger)</label>
+        <textarea id="proofPoints" placeholder="Something true about the business that I can't make up myself — e.g. '12 years in business', 'we fixed a client's cracked molar same-day', 'named service: Invisalign for teens'. Leave blank and the article will mark those spots with [ADD REAL DETAIL] instead of inventing something."></textarea>
+      </div>
+      <div class="field">
+        <label>Brand voice for drafts</label>
+        <select id="voice">
+          <option value="friendly, plain-spoken local expert" selected>Friendly local expert</option>
+          <option value="confident, no-nonsense practitioner">No-nonsense practitioner</option>
+          <option value="warm and reassuring, especially for anxious readers">Warm & reassuring</option>
+          <option value="sharp, data-driven, slightly informal">Data-driven & informal</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Number of cluster ideas</label>
+        <select id="ideaCount">
+          <option value="8">8</option>
+          <option value="12" selected>12</option>
+          <option value="16">16</option>
+          <option value="20">20</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Publish pace</label>
+        <select id="pace">
+          <option value="1">1 post / week</option>
+          <option value="2" selected>2 posts / week</option>
+          <option value="3">3 posts / week</option>
+          <option value="7">Daily</option>
+        </select>
+      </div>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-primary" id="genBtn">Generate cluster</button>
+      <span class="status" id="statusMsg"></span>
+    </div>
+  </div>
+</div>
+
+<section class="results" id="results">
+  <div class="wrap">
+
+    <div class="section-head">
+      <h2>Topic cluster map</h2>
+      <span class="pillar-tag" id="pillarTag">—</span>
+    </div>
+    <div class="map-wrap">
+      <svg id="mapSvg" viewBox="0 0 900 560"></svg>
+      <div class="legend">
+        <span><i class="dot" style="background:var(--info)"></i>Informational</span>
+        <span><i class="dot" style="background:var(--commercial)"></i>Commercial</span>
+        <span><i class="dot" style="background:var(--transactional)"></i>Transactional</span>
+      </div>
+    </div>
+
+    <div class="section-head" style="margin-top:8px;">
+      <h2>Blog ideas</h2>
+      <span class="empty-hint" id="ideaCountLabel"></span>
+    </div>
+    <div class="cards" id="cardsWrap"></div>
+
+    <div class="calendar">
+      <div class="section-head"><h2>Publish calendar</h2></div>
+      <div id="calendarWrap"></div>
+    </div>
+
+    <div class="export-row">
+      <button class="btn btn-ghost" id="exportBtn">Copy list as Markdown</button>
+      <button class="btn btn-ghost" id="regenBtn">Regenerate cluster</button>
+    </div>
+  </div>
+</section>
+
+<div class="footer-note wrap">
+  Ideas and drafts are AI-generated starting points based on what you enter above — always verify search volume and competition with Google Search Console / Keyword Planner before committing to a calendar. Google doesn't penalize content for being AI-assisted; it penalizes low-quality, generic content regardless of who or what wrote it. Treat every draft as a first pass: add real specifics, fact-check any bracketed [ADD REAL DETAIL] spots, and edit in your own voice before publishing. This tool needs to stay open inside a Claude.ai chat to work — downloading and opening it separately won't connect to the API.
+</div>
+
+<div class="preview-overlay" id="previewOverlay">
+  <button class="preview-close" id="previewCloseBtn">✕ Close preview</button>
+  <div class="preview-window">
+    <div class="browser-bar">
+      <div class="traffic"><span class="r"></span><span class="y"></span><span class="g"></span></div>
+      <div class="browser-url" id="previewSlug"></div>
+    </div>
+    <div class="wp-post">
+      <div class="wp-hero"><span class="wp-hero-label" id="previewHeroLabel"></span></div>
+      <div class="wp-meta" id="previewMeta"></div>
+      <h1 class="wp-title" id="previewTitle"></h1>
+      <div class="wp-body" id="previewBody"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const INTENT_COLOR = { informational: 'var(--info)', commercial: 'var(--commercial)', transactional: 'var(--transactional)' };
+let currentData = null;
+
+async function fetchClaudeText(system, userMsg) {
+  let res;
+  try {
+    res = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-6",
+        max_tokens: 6000,
+        system: system,
+        messages: [{ role: "user", content: userMsg }]
+      })
+    });
+  } catch (networkErr) {
+    throw new Error("Network error reaching the API: " + networkErr.message);
+  }
+
+  if (!res.ok) {
+    let detail = '';
+    try { detail = await res.text(); } catch (e) {}
+    throw new Error(`API error ${res.status}: ${detail.slice(0, 200)}`);
+  }
+
+  const data = await res.json();
+  return data.content.map(b => b.text || "").join("\n");
+}
+
+async function callClaude(system, userMsg) {
+  const text = await fetchClaudeText(system, userMsg);
+  return parseJsonLoose(text);
+}
+
+function parseJsonLoose(text) {
+  let clean = text.replace(/```json|```/g, "").trim();
+  try {
+    return JSON.parse(clean);
+  } catch (e) {
+    // fallback: extract the outermost {...} block in case the model added stray text
+    const start = clean.indexOf('{');
+    const end = clean.lastIndexOf('}');
+    if (start !== -1 && end !== -1 && end > start) {
+      try {
+        return JSON.parse(clean.slice(start, end + 1));
+      } catch (e2) {
+        throw new Error("Could not parse the model's response as JSON: " + e2.message);
+      }
+    }
+    throw new Error("Could not parse the model's response as JSON: " + e.message);
+  }
+}
+
+function setStatus(msg, isErr) {
+  const el = document.getElementById('statusMsg');
+  el.textContent = msg;
+  el.className = 'status' + (isErr ? ' err' : '');
+}
+
+document.getElementById('genBtn').addEventListener('click', generateCluster);
+document.getElementById('regenBtn').addEventListener('click', generateCluster);
+document.getElementById('exportBtn').addEventListener('click', exportMarkdown);
+
+async function generateCluster() {
+  const bizName = document.getElementById('bizName').value.trim();
+  const niche = document.getElementById('niche').value.trim();
+  if (!bizName || !niche) {
+    setStatus('Add at least a business name and niche.', true);
+    return;
+  }
+  const bizUrl = document.getElementById('bizUrl').value.trim();
+  const location = document.getElementById('location').value.trim();
+  const audience = document.getElementById('audience').value.trim();
+  const services = document.getElementById('services').value.trim();
+  const count = document.getElementById('ideaCount').value;
+
+  const genBtn = document.getElementById('genBtn');
+  genBtn.disabled = true;
+  setStatus('Analyzing niche and building cluster...', false);
+
+  const system = `You are a senior technical SEO content strategist. Output ONLY valid JSON, no markdown fences, no preamble, no explanation. Schema:
+{"pillar":{"title":string,"keyword":string},"ideas":[{"title":string,"keyword":string,"secondaryKeywords":[string,string,string],"intent":"informational"|"commercial"|"transactional","difficulty":"Low"|"Medium"|"High","angle":string,"contentType":string,"week":integer}]}
+Rules: exactly ${count} ideas. "secondaryKeywords" is 3 realistic related/LSI terms for that specific idea. "angle" is one sentence explaining why this topic earns links/ranks for this specific business (not generic). "week" is an integer starting at 1, distributing ideas evenly across a realistic publish schedule. Vary intent across informational/commercial/transactional realistically (most should be informational, a smaller share commercial, fewest transactional). Ground ideas in what this specific business plausibly offers based on the niche/services given — do not invent services or claims that contradict them.`;
+
+  const userMsg = `Business: ${bizName}
+Website: ${bizUrl || 'not provided'}
+Niche/industry: ${niche}
+Target location: ${location || 'not local-specific'}
+Target audience: ${audience || 'not specified'}
+Services/existing keywords: ${services || 'not specified'}`;
+
+  try {
+    const data = await callClaude(system, userMsg);
+    currentData = data;
+    renderResults(data);
+    setStatus('Done. ' + data.ideas.length + ' ideas generated.', false);
+  } catch (e) {
+    console.error(e);
+    setStatus('Error: ' + e.message, true);
+  } finally {
+    genBtn.disabled = false;
+  }
+}
+
+function renderResults(data) {
+  document.getElementById('results').classList.add('show');
+  document.getElementById('pillarTag').textContent = data.pillar.keyword;
+  document.getElementById('ideaCountLabel').textContent = data.ideas.length + ' ideas';
+
+  renderMap(data);
+  renderCards(data);
+  renderCalendar(data);
+
+  document.getElementById('results').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function renderMap(data) {
+  const svg = document.getElementById('mapSvg');
+  const cx = 450, cy = 280, r = 210;
+  const n = data.ideas.length;
+  let html = '';
+
+  data.ideas.forEach((idea, i) => {
+    const angle = (i / n) * Math.PI * 2 - Math.PI / 2;
+    const x = cx + r * Math.cos(angle);
+    const y = cy + r * Math.sin(angle);
+    const color = INTENT_COLOR[idea.intent] || 'var(--ink-dim)';
+    html += `<line class="node-line" x1="${cx}" y1="${cy}" x2="${x}" y2="${y}"/>`;
+    html += `<circle class="node-dot" cx="${x}" cy="${y}" r="9" style="stroke:${color}"/>`;
+    const labelX = cx + (r + 26) * Math.cos(angle);
+    const labelY = cy + (r + 26) * Math.sin(angle);
+    const anchor = Math.cos(angle) > 0.15 ? 'start' : (Math.cos(angle) < -0.15 ? 'end' : 'middle');
+    const shortTitle = idea.title.length > 30 ? idea.title.slice(0, 28) + '…' : idea.title;
+    html += `<text class="node-label" x="${labelX}" y="${labelY}" text-anchor="${anchor}">${escapeXml(shortTitle)}</text>`;
+  });
+
+  html = `<circle class="node-pillar" cx="${cx}" cy="${cy}" r="46"/>` +
+    `<text class="node-label-pillar" x="${cx}" y="${cy - 4}" text-anchor="middle">${escapeXml(wrapPillar(data.pillar.title)[0]||'')}</text>` +
+    `<text class="node-label-pillar" x="${cx}" y="${cy + 14}" text-anchor="middle">${escapeXml(wrapPillar(data.pillar.title)[1]||'')}</text>` +
+    html;
+
+  svg.innerHTML = html;
+}
+
+function wrapPillar(title) {
+  const words = title.split(' ');
+  const mid = Math.ceil(words.length / 2);
+  return [words.slice(0, mid).join(' '), words.slice(mid).join(' ')];
+}
+
+function escapeXml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function renderCards(data) {
+  const wrap = document.getElementById('cardsWrap');
+  wrap.innerHTML = '';
+  data.ideas.forEach((idea, i) => {
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.innerHTML = `
+      <div class="card-top">
+        <h3>${escapeHtml(idea.title)}</h3>
+        <span class="intent-tag intent-${idea.intent}">${idea.intent}</span>
+      </div>
+      <div class="kw">${escapeHtml(idea.keyword)}</div>
+      <div class="sec-kw">${(idea.secondaryKeywords||[]).map(k => `<span>${escapeHtml(k)}</span>`).join('')}</div>
+      <p class="angle">${escapeHtml(idea.angle)}</p>
+      <div class="meta-row">
+        <span>${escapeHtml(idea.contentType)} · Week ${idea.week}</span>
+        <span class="diff diff-${idea.difficulty}">${idea.difficulty} difficulty</span>
+      </div>
+      <button class="interview-btn" data-idx="${i}">
+        <span>Create blog post</span><span>+</span>
+      </button>
+      <div class="interview-body" id="interview-${i}"></div>
+    `;
+    wrap.appendChild(card);
+  });
+
+  wrap.querySelectorAll('.interview-btn').forEach(btn => {
+    btn.addEventListener('click', () => toggleInterview(parseInt(btn.dataset.idx), btn));
+  });
+}
+
+const interviewState = {};
+const MAX_PRIMARY_QUESTIONS = 4;
+
+function toggleInterview(idx, btn) {
+  const body = document.getElementById('interview-' + idx);
+  const isOpen = body.classList.contains('show');
+  if (isOpen) {
+    body.classList.remove('show');
+    btn.querySelector('span:last-child').textContent = '+';
+    return;
+  }
+  body.classList.add('show');
+  btn.querySelector('span:last-child').textContent = '−';
+  if (!interviewState[idx]) {
+    interviewState[idx] = { questions: [], answers: [], currentQ: 0, done: false };
+    loadQuestions(idx);
+  } else {
+    renderInterviewPanel(idx);
+  }
+}
+
+async function loadQuestions(idx) {
+  const body = document.getElementById('interview-' + idx);
+  body.innerHTML = '<span class="empty-hint">Preparing questions...</span>';
+
+  const idea = currentData.ideas[idx];
+  const system = `You are preparing to interview a subject-matter expert to extract real personal experience, client examples, and practical insight for a blog post. Write exactly ${MAX_PRIMARY_QUESTIONS} short, conversational questions — one at a time is how they'll be shown, but you're writing all ${MAX_PRIMARY_QUESTIONS} now. Focus on real-world application, edge cases, common mistakes, and actionable steps specific to the topic and keyword below — not generic marketing questions. Keep each question short, like something asked out loud, not a survey item.
+
+Output ONLY valid JSON, no markdown fences: {"questions":[string,string,string,string]}`;
+
+  const userMsg = `Topic: ${idea.title}
+Primary keyword: ${idea.keyword}
+Secondary keywords: ${(idea.secondaryKeywords||[]).join(', ')}
+Angle: ${idea.angle}`;
+
+  try {
+    const result = await callClaude(system, userMsg);
+    interviewState[idx].questions = result.questions.slice(0, MAX_PRIMARY_QUESTIONS);
+    renderInterviewPanel(idx);
+  } catch (e) {
+    console.error(e);
+    body.innerHTML = '<span class="empty-hint" style="color:var(--danger)">Could not load questions. Try reopening this panel.</span>';
+  }
+}
+
+function renderInterviewPanel(idx) {
+  const st = interviewState[idx];
+  const body = document.getElementById('interview-' + idx);
+  const qNum = st.currentQ;
+  const question = st.questions[qNum];
+  body.innerHTML = `
+    <div class="q-progress">Question ${qNum + 1} of ${MAX_PRIMARY_QUESTIONS}</div>
+    <div class="current-q">${escapeHtml(question)}</div>
+    <div class="answer-row">
+      <textarea id="answer-${idx}" placeholder="Type your answer..."></textarea>
+      <button class="btn btn-primary" data-idx="${idx}" id="sendAnswer-${idx}">${qNum === MAX_PRIMARY_QUESTIONS - 1 ? 'Finish' : 'Next'}</button>
+    </div>
+    <button class="skip-link" data-idx="${idx}" id="skipInterview-${idx}">Skip remaining questions, write the article now</button>
+  `;
+  document.getElementById('sendAnswer-' + idx).addEventListener('click', () => submitAnswer(idx));
+  document.getElementById('skipInterview-' + idx).addEventListener('click', () => generateFinalArticle(idx));
+  const ta = document.getElementById('answer-' + idx);
+  ta.focus();
+  ta.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submitAnswer(idx); }
+  });
+}
+
+function submitAnswer(idx) {
+  const st = interviewState[idx];
+  const textarea = document.getElementById('answer-' + idx);
+  const answer = textarea.value.trim();
+  if (!answer) return;
+  st.answers.push({ question: st.questions[st.currentQ], answer });
+  st.currentQ += 1;
+  if (st.currentQ >= st.questions.length) {
+    generateFinalArticle(idx);
+  } else {
+    renderInterviewPanel(idx);
+  }
+}
+
+async function generateFinalArticle(idx) {
+  const body = document.getElementById('interview-' + idx);
+  const st = interviewState[idx];
+  body.innerHTML = '<span class="empty-hint">Writing the full article now — this takes a moment...</span>';
+
+  const idea = currentData.ideas[idx];
+  const bizName = document.getElementById('bizName').value.trim();
+  const proofPoints = document.getElementById('proofPoints').value.trim();
+  const voice = document.getElementById('voice').value;
+  const transcriptText = st.answers.map(h => `Q: ${h.question}\nA: ${h.answer}`).join('\n\n');
+
+  const system = `You are an experienced human writer producing a high-ranking, E-E-A-T-driven blog post. The interview answers below are your primary source material — the article's substance comes from them, not from generic knowledge. Voice: ${voice}.
+
+Intent & Entity Mapping:
+- Identify this topic's primary search intent and map the entities/related concepts needed to cover it completely — prioritize topical coverage and entity alignment over forcing exact-match keyword repetition.
+
+SEO & Coverage:
+- Place the primary keyword naturally in the H1, SEO title, meta description, introduction (first 10% of the article), one H2, and the conclusion.
+- Weave in secondary keywords naturally where relevant. Natural language flow always wins over forced placement.
+
+Structure & E-E-A-T:
+- Exactly one H1, a logical H2/H3 hierarchy, bullet points where useful, at least one markdown comparison table or summary block, and an FAQ section suitable for a Rich Snippet if the topic supports it.
+- Lead with real-world experience from the interview and give clear takeaways throughout — this is what makes it E-E-A-T, not keyword density.
+- Vary sentence length deliberately — mix short punchy sentences with longer ones. Never let three sentences in a row start the same way or run the same length. It's fine to start a sentence with "But" or "And," and fine to use a sentence fragment occasionally.
+- Never use these words/phrases: delve, tapestry, testament, vital, crucial, unlock, navigate, landscape, "in today's world", furthermore, moreover, "it's important to note".
+- Never fabricate a live external or internal URL. Where a link should go, write a bracketed placeholder in this exact format: [Link to: Topic Name].
+- Do not fabricate any statistic, client name, award, or outcome beyond what appears in the interview answers or the real proof points given. Where something is missing, write [ADD REAL DETAIL: what's needed] instead of inventing it.
+
+Output format — this is critical, follow it exactly:
+First output a line containing only: ---JSON---
+Then a single-line JSON object with this schema (do NOT include the article body in this JSON — leave it out entirely):
+{"h1":string,"seoTitle":string,"metaDescription":string,"urlSlug":string,"schemaType":string,"schemaReason":string,"imagePrompts":[{"prompt":string,"altText":string},{"prompt":string,"altText":string}],"linkPlaceholders":[string,string]}
+Then a line containing only: ---ARTICLE---
+Then the full article body as plain markdown text (NOT inside JSON, NOT escaped — write it exactly as it should be read, with real line breaks, quotes, and punctuation).
+Rules: seoTitle under 60 characters. metaDescription 150-160 characters. urlSlug lowercase-hyphenated. schemaType is the single best fit (Article, FAQPage, HowTo, etc.) with schemaReason as one short sentence why — prefer FAQPage if the article includes an FAQ section. The article body starts after the H1 (## for H2, ### for H3), including the comparison/summary table and FAQ section. imagePrompts has exactly 2 entries. linkPlaceholders has exactly 2 entries in the format "[Link to: Topic Name]" marking where an internal and an external link go.`;
+
+  const userMsg = `Business: ${bizName}
+Topic: ${idea.title}
+Primary keyword: ${idea.keyword}
+Secondary keywords: ${(idea.secondaryKeywords||[]).join(', ')}
+
+Interview transcript (primary source material):
+"""
+${transcriptText || 'No interview answers given — write conservatively and mark gaps with [ADD REAL DETAIL].'}
+"""
+
+Additional real proof points:
+"""
+${proofPoints || 'none provided'}
+"""`;
+
+  try {
+    const rawText = await fetchClaudeText(system, userMsg);
+    const markerIdx = rawText.indexOf('---ARTICLE---');
+    if (markerIdx === -1) {
+      throw new Error("Response was missing the expected ---ARTICLE--- marker.");
+    }
+    const jsonPart = rawText.slice(0, markerIdx).replace('---JSON---', '').trim();
+    const meta = parseJsonLoose(jsonPart);
+    const article = rawText.slice(markerIdx + '---ARTICLE---'.length).trim();
+    const result = Object.assign({}, meta, { article });
+    st.result = result;
+    renderFinalArticle(idx, result);
+  } catch (e) {
+    console.error(e);
+    body.innerHTML = `<span class="empty-hint" style="color:var(--danger)">Failed to generate the article: ${escapeHtml(e.message)}. Try reopening this panel.</span>`;
+  }
+}
+
+function renderFinalArticle(idx, r) {
+  const body = document.getElementById('interview-' + idx);
+  const highlighted = escapeHtml(r.article).replace(/\[ADD REAL DETAIL:?[^\]]*\]/g, m => `<mark>${m}</mark>`);
+  body.innerHTML = `
+    <div class="article-deliverable">
+      <div class="article-field">
+        <div class="lbl"><span>H1</span></div>
+        <div class="val">${escapeHtml(r.h1)}</div>
+      </div>
+      <div class="article-field">
+        <div class="lbl"><span>SEO Title</span><span class="charcount">${r.seoTitle.length}/60</span></div>
+        <div class="val">${escapeHtml(r.seoTitle)}</div>
+      </div>
+      <div class="article-field">
+        <div class="lbl"><span>Meta Description</span><span class="charcount">${r.metaDescription.length}/160</span></div>
+        <div class="val">${escapeHtml(r.metaDescription)}</div>
+      </div>
+      <div class="article-field">
+        <div class="lbl"><span>URL Slug</span></div>
+        <div class="val">/${escapeHtml(r.urlSlug)}</div>
+      </div>
+      <div class="article-field">
+        <div class="lbl"><span>Schema Markup</span></div>
+        <div class="val">${escapeHtml(r.schemaType)} — <span style="color:var(--ink-faint)">${escapeHtml(r.schemaReason)}</span></div>
+      </div>
+      <div class="article-field">
+        <div class="lbl"><span>Article Body</span><span class="charcount">~${r.article.trim().split(/\s+/).length} words</span></div>
+        <div class="article-body-text">${highlighted}</div>
+      </div>
+      <div class="article-field">
+        <div class="lbl">Image Prompts &amp; Alt Text</div>
+        ${r.imagePrompts.map((p,i) => `<div class="img-prompt-item"><b>Image ${i+1}:</b> ${escapeHtml(p.prompt)}<br><b>Alt text:</b> ${escapeHtml(p.altText)}</div>`).join('')}
+      </div>
+      <div class="article-field">
+        <div class="lbl">Link Placeholders</div>
+        ${r.linkPlaceholders.map(l => `<div class="link-placeholder-item">${escapeHtml(l)}</div>`).join('')}
+      </div>
+      <div class="export-row" style="margin-top:0;">
+        <button class="draft-copy" id="copyArticle-${idx}">Copy full deliverable</button>
+        <button class="btn btn-primary" id="previewArticle-${idx}" style="padding:9px 16px;font-size:12px;">Preview as blog post</button>
+      </div>
+    </div>
+  `;
+  document.getElementById('copyArticle-' + idx).addEventListener('click', () => {
+    const full = `H1: ${r.h1}\nSEO Title: ${r.seoTitle}\nMeta Description: ${r.metaDescription}\nURL Slug: /${r.urlSlug}\nSchema: ${r.schemaType} (${r.schemaReason})\n\n${r.article}\n\nImage Prompts:\n${r.imagePrompts.map((p,i)=>`${i+1}. ${p.prompt}\n   Alt: ${p.altText}`).join('\n')}\n\nLink placeholders:\n${r.linkPlaceholders.join('\n')}`;
+    navigator.clipboard.writeText(full).then(() => setStatus('Full deliverable copied to clipboard.', false));
+  });
+  document.getElementById('previewArticle-' + idx).addEventListener('click', () => openPreview(r));
+}
+
+function openPreview(r) {
+  const bizName = document.getElementById('bizName').value.trim() || 'yoursite';
+  const wordCount = r.article.trim().split(/\s+/).length;
+  const readMins = Math.max(1, Math.round(wordCount / 200));
+  const slugDomain = bizName.toLowerCase().replace(/[^a-z0-9]+/g, '') || 'yoursite';
+
+  let bodyHtml = marked.parse(r.article);
+  bodyHtml = bodyHtml
+    .replace(/\[ADD REAL DETAIL:?[^\]]*\]/g, m => `<mark>${m}</mark>`)
+    .replace(/\[Link to:[^\]]*\]/g, m => `<mark>${m}</mark>`);
+
+  const hero = r.imagePrompts && r.imagePrompts[0];
+  const inline = r.imagePrompts && r.imagePrompts[1];
+  if (inline) {
+    const firstPEnd = bodyHtml.indexOf('</p>');
+    if (firstPEnd !== -1) {
+      const block = `<div class="wp-inline-img"><span class="wp-hero-label">${escapeHtml(inline.altText)}</span></div>`;
+      bodyHtml = bodyHtml.slice(0, firstPEnd + 4) + block + bodyHtml.slice(firstPEnd + 4);
+    }
+  }
+
+  document.getElementById('previewSlug').textContent = `${slugDomain}.com/${r.urlSlug}`;
+  document.getElementById('previewHeroLabel').textContent = hero ? hero.altText : 'Featured image';
+  document.getElementById('previewMeta').textContent = `${bizName} · ${readMins} min read`;
+  document.getElementById('previewTitle').textContent = r.h1;
+  document.getElementById('previewBody').innerHTML = bodyHtml;
+  document.getElementById('previewOverlay').classList.add('show');
+}
+
+document.getElementById('previewCloseBtn').addEventListener('click', closePreview);
+document.getElementById('previewOverlay').addEventListener('click', e => {
+  if (e.target.id === 'previewOverlay') closePreview();
+});
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closePreview();
+});
+function closePreview() {
+  document.getElementById('previewOverlay').classList.remove('show');
+}
+
+function renderCalendar(data) {
+  const wrap = document.getElementById('calendarWrap');
+  const byWeek = {};
+  data.ideas.forEach(idea => {
+    if (!byWeek[idea.week]) byWeek[idea.week] = [];
+    byWeek[idea.week].push(idea);
+  });
+  const weeks = Object.keys(byWeek).map(Number).sort((a,b) => a-b);
+  wrap.innerHTML = weeks.map(w => `
+    <div class="week-row">
+      <div class="week-label">Week ${w}</div>
+      <div class="week-items">
+        ${byWeek[w].map(idea => `<div class="week-pill"><b>${escapeHtml(idea.title)}</b></div>`).join('')}
+      </div>
+    </div>
+  `).join('');
+}
+
+function escapeHtml(s) {
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+function exportMarkdown() {
+  if (!currentData) return;
+  let md = `# Content Cluster: ${currentData.pillar.title}\n\nPillar keyword: ${currentData.pillar.keyword}\n\n`;
+  currentData.ideas.forEach((idea, i) => {
+    md += `## ${i+1}. ${idea.title}\n- Keyword: ${idea.keyword}\n- Intent: ${idea.intent}\n- Difficulty: ${idea.difficulty}\n- Content type: ${idea.contentType}\n- Week: ${idea.week}\n- Angle: ${idea.angle}\n\n`;
+  });
+  navigator.clipboard.writeText(md).then(() => {
+    setStatus('Copied to clipboard as Markdown.', false);
+  }).catch(() => {
+    setStatus('Could not copy — select and copy manually.', true);
+  });
+}
+</script>
+
+</body>
+</html>
